@@ -215,7 +215,7 @@ Try: 'Compare Gemini 2.0 vs Claude vs Kimi for code reasoning, list claims with 
   // ---------- Config ----------
   // Set to your proxy base URL to route calls server-side (keeps keys off the browser).
   // e.g. 'http://localhost:3000' — leave empty to call APIs directly from the browser.
-  const PROXY_BASE = '';
+  const PROXY_BASE = 'http://localhost:3000';
 
   // Current model names (April 2026)
   const MODELS = {
@@ -387,6 +387,42 @@ Try: 'Compare Gemini 2.0 vs Claude vs Kimi for code reasoning, list claims with 
   }
   updateBudgets();
 
+  // ---------- Proxy-side key detection ----------
+  // When PROXY_BASE is set, fetch /health to discover which providers have keys
+  // configured in the server's .env — no manual entry needed.
+  let proxyProviders = {}; // { gemini: 3, groq: 1, ... }
+  async function syncProxyHealth() {
+    if (!PROXY_BASE) return;
+    try {
+      const r = await fetch(`${PROXY_BASE}/health`);
+      if (!r.ok) return;
+      const data = await r.json();
+      proxyProviders = data.providers || {};
+      const active = Object.entries(proxyProviders).filter(([,n]) => n > 0).map(([p,n]) => `${p}(${n})`).join(' ');
+      log(`Proxy connected — keys loaded: ${active || 'none'}`);
+      // Inject proxy keys into keyManager display (masked, so the UI shows them as configured)
+      Object.entries(proxyProviders).forEach(([p, count]) => {
+        if (count > 0 && !keyManager.getKeys(p).length) {
+          // Show a placeholder so the health dashboard reflects proxy keys
+          const el = inputs[p];
+          if (el && !el.value) {
+            el.placeholder = `${count} key(s) loaded from server .env`;
+            el.style.borderColor = 'rgba(46,160,67,.4)';
+          }
+        }
+      });
+    } catch (e) {
+      log(`Proxy not reachable at ${PROXY_BASE} — check that node proxy.js is running`, 'warn');
+    }
+  }
+
+  // A provider is "available" if it has local keys OR proxy has keys for it
+  function hasProvider(p) {
+    if (keyManager.getKeys(p).length > 0) return true;
+    if (PROXY_BASE && (proxyProviders[p] || 0) > 0) return true;
+    return false;
+  }
+
   // ---------- Modes ----------
   let currentMode = 'smart';
   $$('.mode').forEach(b => b.addEventListener('click', () => {
@@ -398,7 +434,7 @@ Try: 'Compare Gemini 2.0 vs Claude vs Kimi for code reasoning, list claims with 
   // ---------- Router ----------
   async function buildPlan(request) {
     const plan = { mode: currentMode, models: [], strategy: '', timestamp: Date.now() };
-    const has = p => keyManager.getKeys(p).length > 0;
+    const has = p => hasProvider(p);
 
     if (currentMode === 'all') {
       ['gemini', 'groq', 'mistral', 'openai', 'anthropic', 'kimi', 'manus'].forEach(p => {
@@ -485,8 +521,10 @@ Try: 'Compare Gemini 2.0 vs Claude vs Kimi for code reasoning, list claims with 
     }
 
     const keyInfo = keyManager.getActiveKey(provider);
-    if (!keyInfo) throw new Error(`No available key for ${provider}`);
-    log(`Using ${provider} key #${keyInfo.index + 1} (${MODELS[provider] || 'default'})`);
+    // When using the proxy, keyInfo may be null (key lives server-side in .env) — that's fine.
+    if (!keyInfo && !PROXY_BASE) throw new Error(`No available key for ${provider}`);
+    if (keyInfo) log(`Using ${provider} key #${keyInfo.index + 1} (${MODELS[provider] || 'default'})`);
+    else log(`Using ${provider} via proxy server key (${MODELS[provider] || 'default'})`);
 
     const t0 = performance.now();
     try {
@@ -589,13 +627,13 @@ Try: 'Compare Gemini 2.0 vs Claude vs Kimi for code reasoning, list claims with 
 
       const latency = Math.round(performance.now() - t0);
       const tokens = Math.ceil(resp.length / 4);
-      keyManager.record(provider, keyInfo.index, true, tokens);
+      if (keyInfo) keyManager.record(provider, keyInfo.index, true, tokens);
       const result = { provider, model: modelName, text: resp, tokens, latency };
       cache.set(cacheKey, result);
       return result;
 
     } catch (e) {
-      keyManager.record(provider, keyInfo.index, false, 0, String(e));
+      if (keyInfo) keyManager.record(provider, keyInfo.index, false, 0, String(e));
       log(`${provider} failed: ${e.message}`, 'error');
       // Fallback: Gemini → Groq
       if (provider === 'gemini' && keyManager.getKeys('groq').length) {
@@ -644,7 +682,7 @@ Produce the final synthesized answer now:`;
     try {
       log(`Synthesizing with ${synthProvider}...`);
       const keyInfo = keyManager.getActiveKey(synthProvider);
-      if (!keyInfo) return null;
+      if (!keyInfo && !PROXY_BASE) return null;
 
       let synthText = '';
       if (PROXY_BASE) {
@@ -661,7 +699,7 @@ Produce the final synthesized answer now:`;
         synthText = synthResult.text || '';
       }
 
-      keyManager.record(synthProvider, keyInfo.index, true, Math.ceil(synthText.length / 4));
+      if (keyInfo) keyManager.record(synthProvider, keyInfo.index, true, Math.ceil(synthText.length / 4));
       return { text: synthText, synthesizer: synthProvider };
     } catch (e) {
       log(`Synthesis LLM failed: ${e.message}`, 'warn');
@@ -851,9 +889,11 @@ Produce the final synthesized answer now:`;
   });
 
   // ---------- Init ----------
-  log('Conductor v3.3 ready. Add keys → choose mode → Orchestrate.');
-  log('Kimi (kimi-k2.5) and Manus (async task API) now fully supported.');
-  renderPlan({ mode: 'idle', strategy: 'Awaiting request...', models: [], timestamp: Date.now() });
+  syncProxyHealth().then(() => {
+    log('Conductor v3.3 ready. Add keys → choose mode → Orchestrate.');
+    log('Kimi (kimi-k2.5) and Manus (async task API) now fully supported.');
+    renderPlan({ mode: 'idle', strategy: 'Awaiting request...', models: [], timestamp: Date.now() });
+  });
 })();
 </script>
 </body>
