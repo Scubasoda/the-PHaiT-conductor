@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mistral Conductor v3.3</title>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#141a23; --glass:rgba(20,26,35,.72);
+    --border:rgba(255,255,255,.08); --text:#e6edf3; --muted:#8b949e;
+    --accent:#ff6b35; --accent-2:#ff8c5a; --ok:#2ea043; --warn:#d29922; --err:#f85149;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden}
+  .app{display:flex;flex-direction:column;height:100vh;background:radial-gradient(1200px 800px at 80% -20%, rgba(255,107,53,.08), transparent 60%), radial-gradient(900px 600px at -10% 20%, rgba(80,140,255,.06), transparent 50%), var(--bg)}
+  header{height:56px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--border);background:rgba(10,14,20,.7);backdrop-filter:blur(10px);position:sticky;top:0;z-index:10}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.2px;font-family:'Segoe UI',system-ui,sans-serif}
+  .logo .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 16px rgba(255,107,53,.7)}
+  .version{margin-left:auto;color:var(--muted);font-size:12px}
+  main.grid{flex:1;display:grid;grid-template-columns:300px 1fr 350px;gap:14px;padding:14px;min-height:0}
+  .glass{background:var(--glass);border:1px solid var(--border);border-radius:14px;backdrop-filter:blur(14px);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .left-panel{padding:14px;overflow:auto}
+  .panel-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin:2px 0 10px;font-family:'Segoe UI',system-ui,sans-serif}
+  .panel-section{margin-bottom:12px}
+  .panel-section label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-family:'Segoe UI',system-ui,sans-serif}
+  .panel-section input,.panel-section textarea{width:100%;background:#0f141b;border:1px solid rgba(255,255,255,.1);color:var(--text);border-radius:9px;padding:8px 10px;font-size:12px;font-family:ui-monospace,monospace;outline:none;transition:.2s}
+  .panel-section input:focus,.panel-section textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,107,53,.15)}
+  .panel-section textarea{min-height:58px;resize:vertical}
+  .key-hint{font-size:10px;color:#5a6472;margin-top:3px;font-family:'Segoe UI',system-ui,sans-serif}
+  .budget{margin-top:5px}
+  .meter{height:4px;background:#0b1118;border-radius:4px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}
+  .meter span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));width:0%;transition:width .5s}
+  .btn-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .btn{background:#18212d;border:1px solid rgba(255,255,255,.1);color:var(--text);padding:7px 10px;border-radius:9px;font-size:12px;cursor:pointer;transition:.18s;font-family:'Segoe UI',system-ui,sans-serif}
+  .btn:hover{background:#1f2a38;border-color:rgba(255,255,255,.18);transform:translateY(-1px)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#0a0e14;font-weight:700}
+  .center-panel{display:flex;flex-direction:column;gap:12px;min-height:0}
+  #requestInput{width:100%;height:150px;background:#0f141b;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;color:var(--text);font-size:13px;font-family:ui-monospace,monospace;resize:vertical;transition:.2s}
+  #requestInput:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,107,53,.12);outline:none}
+  .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .modes{display:flex;gap:8px;background:#0f141b;border:1px solid rgba(255,255,255,.08);padding:4px;border-radius:999px}
+  .mode{padding:7px 12px;border-radius:999px;background:transparent;border:none;color:#aab4c0;font-size:12px;cursor:pointer;transition:.18s;font-family:'Segoe UI',system-ui,sans-serif}
+  .mode.active{background:rgba(255,107,53,.15);color:#ffd0bd;box-shadow:inset 0 0 0 1px rgba(255,107,53,.35)}
+  #orchestrateBtn{margin-left:auto;padding:10px 18px;font-size:14px;border-radius:10px;background:var(--accent);border:none;color:#0a0e14;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(255,107,53,.25);transition:.18s;font-family:'Segoe UI',system-ui,sans-serif}
+  #orchestrateBtn:hover{transform:translateY(-1px);box-shadow:0 12px 28px rgba(255,107,53,.32)}
+  #orchestrateBtn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+  .plan{padding:12px;min-height:92px}
+  .plan h4{margin:0 0 8px;font-size:12px;color:#ffb08e;font-family:'Segoe UI',system-ui,sans-serif}
+  .plan-item{font-size:12px;color:#c9d1d9;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.06);display:flex;gap:8px;font-family:'Segoe UI',system-ui,sans-serif}
+  .plan-item:last-child{border-bottom:none}
+  .right-panel{padding:14px;display:flex;flex-direction:column;gap:12px;min-height:0}
+  .right-panel h3{margin:0;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-family:'Segoe UI',system-ui,sans-serif}
+  .timeline{background:#0f141b;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px;height:170px;overflow:auto;font-size:12px}
+  .timeline .step{display:flex;gap:10px;padding:5px 0;opacity:.7;font-family:'Segoe UI',system-ui,sans-serif}
+  .timeline .step.active{opacity:1}
+  .timeline .step .dot{width:8px;height:8px;border-radius:50%;background:#2a3442;margin-top:4px;box-shadow:0 0 0 2px rgba(255,107,53,0);flex-shrink:0}
+  .timeline .step.active .dot{background:var(--accent);box-shadow:0 0 10px rgba(255,107,53,.7)}
+  .logs{background:#0b0f14;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px;flex:1;overflow:auto;font-size:11px;color:#a5b1c2;line-height:1.6}
+  .bottom-tabs{margin:0 14px 14px;padding:0;height:270px;display:flex;flex-direction:column}
+  .tabs{display:flex;gap:6px;padding:8px 10px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .tab-btn{background:transparent;border:none;color:#8b949e;padding:9px 12px;font-size:12px;cursor:pointer;border-bottom:2px solid transparent;transition:.15s;font-family:'Segoe UI',system-ui,sans-serif}
+  .tab-btn:hover{color:#c9d1d9}
+  .tab-btn.active{color:#ffcfb8;border-color:var(--accent)}
+  .tab-content{flex:1;overflow:auto;padding:12px 14px;font-size:13px;line-height:1.6;display:none;font-family:'Segoe UI',system-ui,sans-serif}
+  .tab-content.active{display:block}
+  pre.json{background:#0b1118;padding:10px;border-radius:8px;overflow:auto;font-size:11px;border:1px solid rgba(255,255,255,.06);font-family:ui-monospace,monospace;white-space:pre-wrap;word-break:break-word}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .modal.hidden{display:none}
+  .modal-card{width:min(1080px,96vw);max-height:86vh;overflow:auto}
+  .modal-head{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--glass);backdrop-filter:blur(10px)}
+  .modal-body{padding:14px}
+  .provider-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  .ptab{background:#18212d;border:1px solid rgba(255,255,255,.1);color:#8b949e;padding:5px 12px;border-radius:999px;font-size:12px;cursor:pointer;transition:.15s;font-family:'Segoe UI',system-ui,sans-serif}
+  .ptab.active{background:rgba(255,107,53,.15);color:#ffd0bd;border-color:rgba(255,107,53,.35)}
+  .table{width:100%;border-collapse:collapse;font-size:12px}
+  .table th,.table td{text-align:left;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .table th{color:#9fb0c0;font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.06em;font-family:'Segoe UI',system-ui,sans-serif}
+  .table td{font-family:'Segoe UI',system-ui,sans-serif}
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .status-active{background:var(--ok)}.status-cooldown{background:var(--warn)}.status-error{background:var(--err)}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#121a24;border:1px solid rgba(255,255,255,.08);font-size:11px;color:#b6c2d0;font-family:'Segoe UI',system-ui,sans-serif}
+  .synth-badge{display:inline-block;background:rgba(255,107,53,.12);border:1px solid rgba(255,107,53,.3);color:#ffb08e;border-radius:6px;padding:2px 8px;font-size:11px;margin-bottom:8px;font-family:'Segoe UI',system-ui,sans-serif}
+  .warn-banner{background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);border-radius:8px;padding:8px 12px;font-size:11px;color:#e3b341;margin-top:10px;font-family:'Segoe UI',system-ui,sans-serif}
+  @media (max-width:1120px){main.grid{grid-template-columns:1fr;grid-template-rows:auto auto auto} .right-panel{order:3} .bottom-tabs{height:240px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo"><span class="dot"></span> Mistral Conductor <span style="opacity:.6;font-weight:500">v3.3</span></div>
+    <div class="version">production • dark • glass</div>
+  </header>
+
+  <main class="grid">
+    <!-- LEFT -->
+    <aside class="left-panel glass">
+      <div class="panel-title">API Keys & Budget</div>
+      
+      <div class="panel-section">
+        <label>Mistral</label>
+        <input id="key-mistral" type="password" placeholder="msk_...">
+        <div class="budget" data-provider="mistral"><div class="meter"><span></span></div></div>
+      </div>
+      <div class="panel-section">
+        <label>OpenAI</label>
+        <input id="key-openai" type="password" placeholder="sk-...">
+        <div class="budget" data-provider="openai"><div class="meter"><span></span></div></div>
+      </div>
+      <div class="panel-section">
+        <label>Anthropic</label>
+        <input id="key-anthropic" type="password" placeholder="sk-ant-...">
+        <div class="budget" data-provider="anthropic"><div class="meter"><span></span></div></div>
+      </div>
+      <div class="panel-section">
+        <label>Gemini (one per line for rotation)</label>
+        <textarea id="key-gemini" placeholder="AIza...&#10;AIza...&#10;AIza..."></textarea>
+        <div class="budget" data-provider="gemini"><div class="meter"><span></span></div></div>
+        <div class="key-hint">3 keys = 45 RPM free</div>
+      </div>
+      <div class="panel-section">
+        <label>Groq</label>
+        <input id="key-groq" type="password" placeholder="gsk_...">
+        <div class="budget" data-provider="groq"><div class="meter"><span></span></div></div>
+      </div>
+      <div class="panel-section">
+        <label>Kimi (Moonshot AI)</label>
+        <input id="key-kimi" type="password" placeholder="sk-...">
+        <div class="budget" data-provider="kimi"><div class="meter"><span></span></div></div>
+        <div class="key-hint">model: kimi-k2.5 · api.moonshot.ai</div>
+      </div>
+      <div class="panel-section">
+        <label>Manus</label>
+        <input id="key-manus" type="password" placeholder="manus_...">
+        <div class="budget" data-provider="manus"><div class="meter"><span></span></div></div>
+        <div class="key-hint">async task API · ~3–60s per request</div>
+      </div>
+
+      <div class="btn-row">
+        <button id="btnHealth" class="btn">Key Health</button>
+        <button id="btnExport" class="btn">Export</button>
+        <button id="btnImport" class="btn">Import</button>
+        <input type="file" id="importFile" accept=".json" hidden>
+      </div>
+      <div class="warn-banner">⚠ Keys stored in localStorage. Use the proxy for production to keep keys server-side.</div>
+    </aside>
+
+    <!-- CENTER -->
+    <section class="center-panel">
+      <div>
+        <textarea id="requestInput" placeholder="Enter your complex request...
+
+Try: 'Compare Gemini 2.0 vs Claude vs Kimi for code reasoning, list claims with sources, and highlight conflicts.'"></textarea>
+      </div>
+      <div class="controls">
+        <div class="modes">
+          <button class="mode active" data-mode="smart">Smart Router</button>
+          <button class="mode" data-mode="all">Force All</button>
+          <button class="mode" data-mode="debate">Debate</button>
+        </div>
+        <button id="orchestrateBtn">Orchestrate</button>
+        <span class="pill" title="Cache TTL 24h">24h Cache</span>
+        <span class="pill" title="Gemini→Groq fallback">Auto Fallback</span>
+      </div>
+      <div id="routerPlan" class="plan glass"><h4>Router Plan</h4><div style="color:var(--muted);font-size:12px">Awaiting request...</div></div>
+    </section>
+
+    <!-- RIGHT -->
+    <aside class="right-panel glass">
+      <h3>Execution Timeline</h3>
+      <div id="timeline" class="timeline"></div>
+      <h3>Live Logs</h3>
+      <div id="logs" class="logs"></div>
+    </aside>
+  </main>
+
+  <section class="bottom-tabs glass">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="final">Final Answer</button>
+      <button class="tab-btn" data-tab="claims">Claims & Conflicts</button>
+      <button class="tab-btn" data-tab="raw">Raw Responses</button>
+      <button class="tab-btn" data-tab="plan">Plan JSON</button>
+    </div>
+    <div id="tab-final" class="tab-content active"><div id="finalAnswer" style="white-space:pre-wrap;color:#c9d1d9">No answer yet. Add keys on the left, choose a mode, and click Orchestrate.</div></div>
+    <div id="tab-claims" class="tab-content"><div id="claims" style="color:#a5b1c2">Run orchestration to extract claims.</div></div>
+    <div id="tab-raw" class="tab-content"><pre id="rawResponses" class="json">// raw model outputs appear here</pre></div>
+    <div id="tab-plan" class="tab-content"><pre id="planJson" class="json">{}</pre></div>
+  </section>
+</div>
+
+<!-- Key Health Modal -->
+<div id="healthModal" class="modal hidden">
+  <div class="modal-card glass">
+    <div class="modal-head">
+      <h3 style="margin:0;font-size:15px;font-family:'Segoe UI',system-ui,sans-serif">Key Health Dashboard</h3>
+      <button id="closeHealth" class="btn" style="margin-left:auto">Close</button>
+    </div>
+    <div class="modal-body">
+      <div class="provider-tabs" id="providerTabs"></div>
+      <div id="aggStats" style="margin-bottom:10px;color:#8b949e;font-size:12px;font-family:'Segoe UI',system-ui,sans-serif"></div>
+      <table class="table" id="healthTable">
+        <thead><tr><th>Key</th><th>Status</th><th>Requests</th><th>Success</th><th>Tokens</th><th>Cooldown</th><th>24h</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div style="margin-top:10px;color:var(--muted);font-size:11px;font-family:'Segoe UI',system-ui,sans-serif">Sparklines show hourly request volume. Rotation skips keys in cooldown.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+
+  // ---------- Config ----------
+  // Set to your proxy base URL to route calls server-side (keeps keys off the browser).
+  // e.g. 'http://localhost:3000' — leave empty to call APIs directly from the browser.
+  const PROXY_BASE = '';
+
+  // Current model names (April 2026)
+  const MODELS = {
+    gemini:    'gemini-2.0-flash',
+    groq:      'llama-3.3-70b-versatile',
+    openai:    'gpt-4o-mini',
+    anthropic: 'claude-haiku-4-5-20251001',
+    mistral:   'mistral-small-latest',
+    kimi:      'kimi-k2.5',
+    manus:     'manus-1.6'
+  };
+
+  // ---------- Utilities ----------
+  const logEl = $('#logs');
+  function log(msg, level = 'info') {
+    const t = new Date().toLocaleTimeString();
+    const line = document.createElement('div');
+    line.textContent = `[${t}] ${msg}`;
+    line.style.color = level === 'error' ? '#ff7b72' : level === 'warn' ? '#e3b341' : '#a5b1c2';
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  const tlEl = $('#timeline');
+  function timelineClear() { tlEl.innerHTML = ''; }
+  function timelineStep(title, active = false) {
+    const d = document.createElement('div');
+    d.className = 'step' + (active ? ' active' : '');
+    d.innerHTML = `<div class="dot"></div><div><div>${title}</div><div style="color:#6e7681;font-size:10px">${new Date().toLocaleTimeString()}</div></div>`;
+    tlEl.appendChild(d);
+    tlEl.scrollTop = tlEl.scrollHeight;
+  }
+
+  // ---------- TokenBucket ----------
+  class TokenBucket {
+    constructor(capacity = 60, refillPerMin = 60) {
+      this.capacity = capacity; this.tokens = capacity;
+      this.refillRate = refillPerMin / 60000; this.last = Date.now();
+    }
+    refill() {
+      const now = Date.now();
+      this.tokens = Math.min(this.capacity, this.tokens + (now - this.last) * this.refillRate);
+      this.last = now;
+    }
+    take(n = 1) { this.refill(); if (this.tokens >= n) { this.tokens -= n; return true; } return false; }
+  }
+
+  // ---------- Cache (24h localStorage) ----------
+  class Cache24 {
+    constructor(ttl) { this.ttl = ttl; }
+    _k(k) { return 'mc_cache_' + btoa(encodeURIComponent(k)).slice(0, 60); }
+    get(k) {
+      try {
+        const raw = localStorage.getItem(this._k(k));
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (Date.now() - obj.ts > this.ttl) { localStorage.removeItem(this._k(k)); return null; }
+        return obj.v;
+      } catch { return null; }
+    }
+    set(k, v) { try { localStorage.setItem(this._k(k), JSON.stringify({ ts: Date.now(), v })); } catch {} }
+  }
+  const cache = new Cache24(24 * 60 * 60 * 1000);
+
+  // ---------- KeyManager ----------
+  class KeyManager {
+    constructor() {
+      this.providers = ['mistral', 'openai', 'anthropic', 'gemini', 'groq', 'kimi', 'manus'];
+      this.store = JSON.parse(localStorage.getItem('mc_keys_v33') || '{}');
+      this.stats = JSON.parse(localStorage.getItem('mc_stats_v33') || '{}');
+      this.buckets = {}; this.rotation = {};
+      this.providers.forEach(p => { if (!this.stats[p]) this.stats[p] = {}; });
+      this.save();
+    }
+    save() {
+      localStorage.setItem('mc_keys_v33', JSON.stringify(this.store));
+      localStorage.setItem('mc_stats_v33', JSON.stringify(this.stats));
+    }
+    setKeys(provider, value) { this.store[provider] = value; this.save(); this.initProvider(provider); }
+    getKeys(provider) {
+      return (this.store[provider] || '').split(/\n|,/).map(s => s.trim()).filter(Boolean);
+    }
+    initProvider(p) {
+      const keys = this.getKeys(p);
+      keys.forEach((k, i) => {
+        const id = `${p}#${i}`;
+        if (!this.stats[p][id]) this.stats[p][id] = { requests: 0, success: 0, fail: 0, tokens: 0, history: Array(24).fill(0), lastUsed: 0, cooldownUntil: 0 };
+        if (!this.buckets[id]) this.buckets[id] = new TokenBucket(p === 'gemini' ? 15 : p === 'manus' ? 5 : 60, p === 'gemini' ? 15 : p === 'manus' ? 5 : 60);
+      });
+    }
+    getActiveKey(provider) {
+      const keys = this.getKeys(provider);
+      if (!keys.length) return null;
+      this.initProvider(provider);
+      const start = this.rotation[provider] || 0;
+      for (let i = 0; i < keys.length; i++) {
+        const idx = (start + i) % keys.length;
+        const id = `${provider}#${idx}`;
+        const st = this.stats[provider][id];
+        const bucket = this.buckets[id];
+        bucket.refill();
+        if (Date.now() < st.cooldownUntil) continue;
+        if (!bucket.take(1)) continue;
+        this.rotation[provider] = (idx + 1) % keys.length;
+        return { key: keys[idx], index: idx, id, stats: st };
+      }
+      return null;
+    }
+    record(provider, idx, success, tokens = 0, error = null) {
+      const id = `${provider}#${idx}`;
+      const st = this.stats[provider][id] || {};
+      st.requests = (st.requests || 0) + 1;
+      if (success) st.success = (st.success || 0) + 1;
+      else st.fail = (st.fail || 0) + 1;
+      st.tokens = (st.tokens || 0) + tokens;
+      st.lastUsed = Date.now();
+      const h = new Date().getHours();
+      st.history = st.history || Array(24).fill(0);
+      st.history[h] = (st.history[h] || 0) + 1;
+      if (!success && error && /429|rate|quota/i.test(error)) {
+        st.cooldownUntil = Date.now() + 60000;
+      } else if (success) {
+        st.cooldownUntil = 0;
+      }
+      this.stats[provider][id] = st;
+      this.save();
+    }
+    getHealth(provider) {
+      this.initProvider(provider);
+      const keys = this.getKeys(provider);
+      return keys.map((k, i) => {
+        const id = `${provider}#${i}`;
+        const s = this.stats[provider][id] || { requests: 0, success: 0, fail: 0, tokens: 0, history: Array(24).fill(0), cooldownUntil: 0 };
+        const sr = s.requests ? Math.round(s.success * 100 / s.requests) : 0;
+        const cd = Math.max(0, (s.cooldownUntil || 0) - Date.now());
+        return {
+          index: i, key: k,
+          masked: k.slice(0, 6) + '…' + k.slice(-4),
+          status: cd > 0 ? 'cooldown' : (s.fail > s.success && s.requests > 2 ? 'error' : 'active'),
+          requests: s.requests, successRate: sr, tokens: s.tokens, cooldown: cd, history: s.history
+        };
+      });
+    }
+  }
+  const keyManager = new KeyManager();
+
+  // ---------- Wire key inputs ----------
+  const inputs = {
+    mistral: $('#key-mistral'), openai: $('#key-openai'), anthropic: $('#key-anthropic'),
+    gemini: $('#key-gemini'), groq: $('#key-groq'), kimi: $('#key-kimi'), manus: $('#key-manus')
+  };
+  Object.entries(inputs).forEach(([p, el]) => {
+    el.value = keyManager.store[p] || '';
+    el.addEventListener('change', () => {
+      keyManager.setKeys(p, el.value.trim());
+      updateBudgets();
+      log(`Saved ${p} keys (${keyManager.getKeys(p).length})`);
+    });
+  });
+
+  function updateBudgets() {
+    $$('.budget').forEach(b => {
+      const p = b.dataset.provider;
+      const stats = keyManager.stats[p] || {};
+      const total = Object.values(stats).reduce((a, c) => a + (c.requests || 0), 0);
+      const max = p === 'manus' ? 50 : p === 'gemini' ? 150 : 500;
+      const pct = Math.min(100, Math.round(total * 100 / max));
+      b.querySelector('span').style.width = pct + '%';
+    });
+  }
+  updateBudgets();
+
+  // ---------- Modes ----------
+  let currentMode = 'smart';
+  $$('.mode').forEach(b => b.addEventListener('click', () => {
+    $$('.mode').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    currentMode = b.dataset.mode;
+  }));
+
+  // ---------- Router ----------
+  async function buildPlan(request) {
+    const plan = { mode: currentMode, models: [], strategy: '', timestamp: Date.now() };
+    const has = p => keyManager.getKeys(p).length > 0;
+
+    if (currentMode === 'all') {
+      ['gemini', 'groq', 'mistral', 'openai', 'anthropic', 'kimi', 'manus'].forEach(p => {
+        if (has(p)) plan.models.push({ provider: p, reason: 'Force All' });
+      });
+      plan.strategy = 'Parallel dispatch to all available providers.';
+    } else if (currentMode === 'debate') {
+      const picks = ['gemini', 'groq', 'openai', 'anthropic', 'kimi'].filter(has).slice(0, 4);
+      picks.forEach(p => plan.models.push({ provider: p, reason: 'Debate panelist' }));
+      plan.strategy = 'Multi-model debate for conflict detection.';
+    } else {
+      const low = request.toLowerCase();
+      let picks = [];
+      if (/code|debug|function|javascript|python|sql|typescript/.test(low)) {
+        picks = ['groq', 'gemini', 'openai']; plan.strategy = 'Code task: fast, strong coders.';
+      } else if (/analyze|research|report|compare|paper/.test(low)) {
+        picks = ['gemini', 'openai', 'anthropic']; plan.strategy = 'Research: depth + reasoning.';
+      } else if (/creative|write|story|marketing|ad/.test(low)) {
+        picks = ['openai', 'anthropic', 'mistral']; plan.strategy = 'Creative: nuanced language.';
+      } else if (/agent|task|plan|execute|automate/.test(low)) {
+        picks = ['manus', 'kimi', 'openai']; plan.strategy = 'Agentic task: Manus + reasoning models.';
+      } else {
+        picks = ['gemini', 'groq']; plan.strategy = 'General: balanced speed/quality.';
+      }
+      // Mistral meta-routing if available
+      if (has('mistral')) {
+        try {
+          log('Consulting Mistral router...');
+          const mk = keyManager.getActiveKey('mistral');
+          if (mk) {
+            const r = await fetch('https://api.mistral.ai/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + mk.key },
+              body: JSON.stringify({
+                model: 'mistral-small-latest',
+                messages: [
+                  { role: 'system', content: 'Pick 2-3 providers from [gemini,groq,openai,anthropic,mistral,kimi,manus] best for the task. manus is an async agent (slow, ~30s), use only for complex autonomous tasks. Respond with JSON array only, e.g. ["gemini","groq"]' },
+                  { role: 'user', content: request }
+                ],
+                temperature: 0.2
+              })
+            });
+            if (r.ok) {
+              const j = await r.json();
+              const txt = j.choices?.[0]?.message?.content || '[]';
+              const arr = JSON.parse(txt.replace(/```json|```/g, '').trim());
+              if (Array.isArray(arr) && arr.length) { picks = arr; plan.strategy += ' (Mistral-routed)'; }
+            }
+            keyManager.record('mistral', mk.index, true, 80);
+          }
+        } catch (e) { log('Mistral router unavailable, using heuristic', 'warn'); }
+      }
+      picks = [...new Set(picks)].filter(has).slice(0, 3);
+      if (!picks.length && has('gemini')) picks = ['gemini'];
+      picks.forEach(p => plan.models.push({ provider: p, reason: 'Smart pick' }));
+    }
+    if (!plan.models.length) {
+      plan.models.push({ provider: 'mock', reason: 'No keys – demo mode' });
+      plan.strategy = 'Mock mode (no API keys detected).';
+    }
+    return plan;
+  }
+
+  function renderPlan(plan) {
+    const el = $('#routerPlan');
+    el.innerHTML = `<h4>Mode: ${plan.mode} — ${plan.strategy}</h4>` +
+      (plan.models.map(m => `<div class="plan-item"><span style="color:#ff8c5a;width:90px;text-transform:uppercase">${m.provider}</span><span>${m.reason}</span></div>`).join('') || `<div style="color:var(--muted)">No models selected</div>`);
+    $('#planJson').textContent = JSON.stringify(plan, null, 2);
+  }
+
+  // ---------- Dispatch ----------
+  async function dispatchModel(provider, request) {
+    const cacheKey = provider + ':' + request.slice(0, 300);
+    const cached = cache.get(cacheKey);
+    if (cached) { log(`Cache hit for ${provider}`); return { ...cached, cached: true }; }
+
+    if (provider === 'mock') {
+      await new Promise(r => setTimeout(r, 500 + Math.random() * 400));
+      return {
+        provider, model: 'mock-v3.3',
+        text: `[MOCK] Comprehensive answer to: "${request.slice(0, 120)}..."\n\n• Key insight 1: Demonstrates routing.\n• Key insight 2: Shows synthesis.\n• Key insight 3: Fallback chain ready.`,
+        tokens: 140, latency: 520
+      };
+    }
+
+    const keyInfo = keyManager.getActiveKey(provider);
+    if (!keyInfo) throw new Error(`No available key for ${provider}`);
+    log(`Using ${provider} key #${keyInfo.index + 1} (${MODELS[provider] || 'default'})`);
+
+    const t0 = performance.now();
+    try {
+      let resp = '';
+      const modelName = MODELS[provider] || 'default';
+
+      if (PROXY_BASE) {
+        // Route through proxy — keeps keys server-side
+        const r = await fetch(`${PROXY_BASE}/route/${provider}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: request, model: modelName, max_tokens: 900 })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `Proxy ${r.status}`);
+        resp = data.choices?.[0]?.message?.content || '';
+      } else {
+        // Direct browser calls (keys exposed in localStorage — dev/demo only)
+        if (provider === 'gemini') {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${keyInfo.key}`;
+          const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: request }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 900 } }) });
+          if (!r.ok) throw new Error('Gemini ' + r.status);
+          const j = await r.json(); resp = j.candidates?.[0]?.content?.parts?.[0]?.text || '[empty]';
+
+        } else if (provider === 'groq') {
+          const r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + keyInfo.key }, body: JSON.stringify({ model: modelName, messages: [{ role: 'user', content: request }], temperature: 0.7, max_tokens: 900 }) });
+          if (!r.ok) throw new Error('Groq ' + r.status);
+          const j = await r.json(); resp = j.choices?.[0]?.message?.content || '[empty]';
+
+        } else if (provider === 'openai') {
+          const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + keyInfo.key }, body: JSON.stringify({ model: modelName, messages: [{ role: 'user', content: request }], temperature: 0.7, max_tokens: 900 }) });
+          if (!r.ok) throw new Error('OpenAI ' + r.status);
+          const j = await r.json(); resp = j.choices?.[0]?.message?.content || '';
+
+        } else if (provider === 'anthropic') {
+          const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': keyInfo.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: modelName, max_tokens: 900, messages: [{ role: 'user', content: request }] }) });
+          if (!r.ok) throw new Error('Anthropic ' + r.status);
+          const j = await r.json(); resp = j.content?.[0]?.text || '';
+
+        } else if (provider === 'mistral') {
+          const r = await fetch('https://api.mistral.ai/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + keyInfo.key }, body: JSON.stringify({ model: modelName, messages: [{ role: 'user', content: request }], temperature: 0.7, max_tokens: 900 }) });
+          if (!r.ok) throw new Error('Mistral ' + r.status);
+          const j = await r.json(); resp = j.choices?.[0]?.message?.content || '';
+
+        } else if (provider === 'kimi') {
+          // Moonshot AI — OpenAI-compatible endpoint
+          const r = await fetch('https://api.moonshot.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + keyInfo.key },
+            body: JSON.stringify({
+              model: modelName,
+              messages: [{ role: 'user', content: request }],
+              temperature: 0.6,  // Moonshot recommended
+              max_tokens: 900
+            })
+          });
+          if (!r.ok) throw new Error('Kimi ' + r.status);
+          const j = await r.json(); resp = j.choices?.[0]?.message?.content || '';
+
+        } else if (provider === 'manus') {
+          // Manus is an async task API — NOT a chat completions endpoint.
+          // Create task → poll until completed or timeout.
+          const MANUS_BASE = 'https://api.manus.ai/v1';
+          const POLL_MS = 3000;
+          const TIMEOUT_MS = 60000;
+
+          log('Manus: creating task (async, may take 10–60s)...', 'warn');
+          const createRes = await fetch(`${MANUS_BASE}/tasks`, {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + keyInfo.key, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: request, taskMode: 'chat', agentProfile: 'speed' })
+          });
+          if (!createRes.ok) throw new Error('Manus create ' + createRes.status);
+          const task = await createRes.json();
+          const taskId = task.id || task.task_id;
+          if (!taskId) throw new Error('Manus did not return a task ID');
+          log(`Manus task created: ${taskId}`);
+
+          const deadline = Date.now() + TIMEOUT_MS;
+          while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, POLL_MS));
+            const pollRes = await fetch(`${MANUS_BASE}/tasks/${taskId}`, {
+              headers: { Authorization: 'Bearer ' + keyInfo.key }
+            });
+            if (!pollRes.ok) throw new Error('Manus poll ' + pollRes.status);
+            const pollData = await pollRes.json();
+            const status = pollData.status;
+            log(`Manus task ${taskId}: ${status}`);
+            if (status === 'completed' || status === 'done') {
+              resp = pollData.result?.text || pollData.result?.message || pollData.message || JSON.stringify(pollData.result || pollData);
+              break;
+            }
+            if (status === 'failed' || status === 'error') {
+              throw new Error('Manus task failed: ' + (pollData.error?.message || status));
+            }
+          }
+          if (!resp) throw new Error(`Manus task ${taskId} timed out after ${TIMEOUT_MS / 1000}s`);
+        }
+      }
+
+      const latency = Math.round(performance.now() - t0);
+      const tokens = Math.ceil(resp.length / 4);
+      keyManager.record(provider, keyInfo.index, true, tokens);
+      const result = { provider, model: modelName, text: resp, tokens, latency };
+      cache.set(cacheKey, result);
+      return result;
+
+    } catch (e) {
+      keyManager.record(provider, keyInfo.index, false, 0, String(e));
+      log(`${provider} failed: ${e.message}`, 'error');
+      // Fallback: Gemini → Groq
+      if (provider === 'gemini' && keyManager.getKeys('groq').length) {
+        log('Fallback: Gemini → Groq', 'warn');
+        return dispatchModel('groq', request);
+      }
+      await new Promise(r => setTimeout(r, 300));
+      return { provider, model: 'mock-fallback', text: `[FALLBACK MOCK] ${provider} unavailable (${e.message}). Simulated answer for: "${request.slice(0, 100)}..."`, tokens: 110, latency: 300, fallback: true };
+    }
+  }
+
+  // ---------- LLM Synthesis (Stage 3) ----------
+  // Instead of picking the longest response, we ask an available model to
+  // reconcile the raw responses into a single coherent answer.
+  async function synthesizeWithLLM(request, rawResponses, claims, conflicts) {
+    // Pick the best available model for synthesis (prefer Anthropic/OpenAI for reasoning quality)
+    const synthProviders = ['anthropic', 'openai', 'gemini', 'mistral', 'groq', 'kimi'];
+    const synthProvider = synthProviders.find(p => keyManager.getKeys(p).length > 0);
+    if (!synthProvider) return null;  // fall back to simple synthesis
+
+    const rawSummary = rawResponses
+      .filter(r => !r.error && r.text && !r.fallback)
+      .map(r => `=== ${r.provider.toUpperCase()} (${r.model}) ===\n${r.text}`)
+      .join('\n\n');
+
+    if (!rawSummary.trim()) return null;
+
+    const conflictNote = conflicts.length
+      ? `\n\nNOTE: The following conflicts were detected between models:\n${conflicts.map(c => `- ${c.note}: ${c.values.join(' vs ')}`).join('\n')}`
+      : '';
+
+    const synthPrompt = `You are a synthesis engine. Multiple AI models answered the following question. Your job is to produce a single, clear, accurate final answer that:
+1. Integrates the best points from each response
+2. Resolves or acknowledges any conflicts
+3. Does NOT simply copy-paste — synthesise in your own words
+4. Is concise and well-structured (use bullet points or headers if helpful)
+
+ORIGINAL QUESTION:
+${request}
+
+MODEL RESPONSES:
+${rawSummary}${conflictNote}
+
+Produce the final synthesized answer now:`;
+
+    try {
+      log(`Synthesizing with ${synthProvider}...`);
+      const keyInfo = keyManager.getActiveKey(synthProvider);
+      if (!keyInfo) return null;
+
+      let synthText = '';
+      if (PROXY_BASE) {
+        const r = await fetch(`${PROXY_BASE}/route/${synthProvider}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: synthPrompt, model: MODELS[synthProvider], max_tokens: 1200 })
+        });
+        const data = await r.json();
+        synthText = data.choices?.[0]?.message?.content || '';
+      } else {
+        // Direct call reusing the same dispatch logic but with a synthesis prompt
+        const synthResult = await dispatchModel(synthProvider, synthPrompt);
+        synthText = synthResult.text || '';
+      }
+
+      keyManager.record(synthProvider, keyInfo.index, true, Math.ceil(synthText.length / 4));
+      return { text: synthText, synthesizer: synthProvider };
+    } catch (e) {
+      log(`Synthesis LLM failed: ${e.message}`, 'warn');
+      return null;
+    }
+  }
+
+  // ---------- Claim extraction ----------
+  function extractClaims(responses) {
+    const claims = [];
+    responses.filter(r => !r.error).forEach(r => {
+      const sents = (r.text || '').split(/(?<=[.!?])\s+/).filter(s => s.length > 30).slice(0, 6);
+      sents.forEach(s => claims.push({ provider: r.provider, claim: s.trim() }));
+    });
+    return claims;
+  }
+  function findConflicts(claims) {
+    const conflicts = [];
+    const numClaims = claims.map(c => ({ c, m: c.claim.match(/\b\d+(?:\.\d+)?%?\b/g) })).filter(x => x.m);
+    const byTopic = {};
+    numClaims.forEach(x => { const key = x.m[0]; (byTopic[key] = byTopic[key] || []).push(x.c); });
+    Object.entries(byTopic).forEach(([k, arr]) => {
+      const vals = [...new Set(arr.map(a => a.claim.match(/\b\d+(?:\.\d+)?%?\b/)[0]))];
+      if (vals.length > 1) conflicts.push({ type: 'numeric', key: k, values: vals, note: `Different values near "${k}"` });
+    });
+    return conflicts;
+  }
+
+  // ---------- Orchestrate ----------
+  async function orchestrate() {
+    const request = $('#requestInput').value.trim();
+    if (!request) { alert('Enter a request first'); return; }
+    $('#orchestrateBtn').disabled = true;
+    timelineClear(); logEl.innerHTML = '';
+    timelineStep('Planning', true);
+    log('Starting orchestration v3.3');
+    const plan = await buildPlan(request);
+    renderPlan(plan);
+    log(`Plan ready: ${plan.models.length} model(s)`);
+
+    await new Promise(r => setTimeout(r, 100));
+    timelineStep('Dispatching', true);
+    const raw = [];
+    for (const m of plan.models) {
+      try {
+        log(`Dispatching ${m.provider}...`);
+        const res = await dispatchModel(m.provider, request);
+        raw.push(res);
+        log(`${m.provider} completed (${res.tokens} tok, ${res.latency}ms)`);
+      } catch (e) {
+        log(`${m.provider} permanently failed: ${e.message}`, 'error');
+        raw.push({ provider: m.provider, model: 'error', text: `ERROR: ${e.message}`, tokens: 0, error: true });
+      }
+    }
+
+    $('#rawResponses').textContent = raw.map(r =>
+      `=== ${r.provider.toUpperCase()} (${r.model}) ${r.cached ? '[cached]' : ''} ${r.fallback ? '[fallback]' : ''} ===\n${r.text}\n`
+    ).join('\n');
+
+    timelineStep('Analyzing claims', true);
+    const claims = extractClaims(raw);
+    const conflicts = findConflicts(claims);
+    $('#claims').innerHTML =
+      claims.slice(0, 14).map(c =>
+        `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span style="color:#ff8c5a;text-transform:uppercase;font-size:11px">${c.provider}</span>: ${c.claim}</div>`
+      ).join('') +
+      (conflicts.length
+        ? `<div style="margin-top:10px;color:#e3b341"><b>⚠ Conflicts:</b> ${conflicts.map(c => c.note + ': ' + c.values.join(' vs ')).join(' • ')}</div>`
+        : `<div style="margin-top:10px;color:#2ea043">✓ No major numeric conflicts detected.</div>`);
+
+    timelineStep('Synthesizing (LLM)', true);
+    log('Running LLM synthesis...');
+    const synthesis = await synthesizeWithLLM(request, raw, claims, conflicts);
+
+    let final;
+    if (synthesis && synthesis.text) {
+      final = `<div class="synth-badge">✦ Synthesized by ${synthesis.synthesizer}</div>\n<div style="white-space:pre-wrap;color:#c9d1d9">${synthesis.text}</div>\n\n<hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0">\n<div style="font-size:11px;color:var(--muted)">Sources: ${raw.map(r => r.provider.toUpperCase()).join(', ')}${conflicts.length ? ' · ⚠ Conflicts detected — see Claims tab' : ''}</div>`;
+    } else {
+      // Fallback: longest non-error response
+      const best = raw.filter(r => !r.error && !r.fallback).sort((a, b) => (b.text?.length || 0) - (a.text?.length || 0))[0];
+      const txt = best ? best.text : 'All models failed. Add valid API keys or use Mock mode.';
+      final = `<div class="synth-badge">Longest-response fallback (no synthesis model available)</div>\n<div style="white-space:pre-wrap;color:#c9d1d9">${txt}</div>\n\n<div style="font-size:11px;color:var(--muted)">Sources: ${raw.map(r => r.provider.toUpperCase()).join(', ')}</div>`;
+    }
+
+    $('#finalAnswer').innerHTML = final;
+    timelineStep('Complete ✓', true);
+    log('Orchestration complete ✓');
+    $('#orchestrateBtn').disabled = false;
+    updateBudgets();
+  }
+  $('#orchestrateBtn').addEventListener('click', orchestrate);
+
+  // ---------- Tabs ----------
+  $$('.tab-btn').forEach(b => b.addEventListener('click', () => {
+    $$('.tab-btn').forEach(x => x.classList.remove('active'));
+    $$('.tab-content').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    $('#tab-' + b.dataset.tab).classList.add('active');
+  }));
+
+  // ---------- Health Dashboard — all providers ----------
+  let activeHealthProvider = 'gemini';
+  function openHealth() {
+    const modal = $('#healthModal');
+    modal.classList.remove('hidden');
+    // Build provider tabs
+    const tabsEl = $('#providerTabs');
+    tabsEl.innerHTML = '';
+    keyManager.providers.forEach(p => {
+      const keys = keyManager.getKeys(p);
+      const btn = document.createElement('button');
+      btn.className = 'ptab' + (p === activeHealthProvider ? ' active' : '');
+      btn.textContent = `${p} (${keys.length})`;
+      btn.addEventListener('click', () => {
+        activeHealthProvider = p;
+        $$('.ptab').forEach(x => x.classList.remove('active'));
+        btn.classList.add('active');
+        renderHealthTable(p);
+      });
+      tabsEl.appendChild(btn);
+    });
+    renderHealthTable(activeHealthProvider);
+  }
+
+  function renderHealthTable(provider) {
+    const tbody = $('#healthTable tbody');
+    tbody.innerHTML = '';
+    const health = keyManager.getHealth(provider);
+    let totalReq = 0, totalTok = 0, totalSucc = 0, totalAtt = 0;
+    if (!health.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px">No keys saved for ${provider}</td></tr>`;
+      $('#aggStats').textContent = `${provider}: no keys configured`;
+      return;
+    }
+    health.forEach(h => {
+      totalReq += h.requests; totalTok += h.tokens; totalAtt += h.requests;
+      totalSucc += Math.round(h.requests * h.successRate / 100);
+      const tr = document.createElement('tr');
+      const statusCls = h.status === 'active' ? 'status-active' : h.status === 'cooldown' ? 'status-cooldown' : 'status-error';
+      const cd = h.cooldown > 0 ? Math.ceil(h.cooldown / 1000) + 's' : '-';
+      tr.innerHTML = `<td>${h.masked}</td><td><span class="status-dot ${statusCls}"></span>${h.status}</td><td>${h.requests}</td><td>${h.successRate}%</td><td>${h.tokens.toLocaleString()}</td><td>${cd}</td><td><canvas width="80" height="24" data-hist="${h.history.join(',')}"></canvas></td>`;
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll('canvas').forEach(cv => {
+      const d = cv.dataset.hist.split(',').map(Number);
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, 80, 24);
+      ctx.beginPath();
+      const max = Math.max(...d, 1);
+      d.forEach((v, i) => {
+        const x = i * (80 / (d.length - 1));
+        const y = 24 - (v / max) * 20 - 2;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = '#ff6b35'; ctx.lineWidth = 1.5; ctx.stroke();
+    });
+    $('#aggStats').textContent = `${provider} — Keys: ${health.length} | Requests: ${totalReq} | Avg Success: ${totalAtt ? Math.round(totalSucc * 100 / totalAtt) : 0}% | Tokens: ${totalTok.toLocaleString()}`;
+  }
+
+  $('#btnHealth').addEventListener('click', openHealth);
+  $('#closeHealth').addEventListener('click', () => $('#healthModal').classList.add('hidden'));
+
+  // ---------- Export / Import ----------
+  $('#btnExport').addEventListener('click', () => {
+    const data = { keys: keyManager.store, stats: keyManager.stats, exportedAt: new Date().toISOString(), version: '3.3' };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mistral-conductor-v33.json';
+    a.click();
+    log('Exported keys & stats');
+  });
+  $('#btnImport').addEventListener('click', () => $('#importFile').click());
+  $('#importFile').addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        keyManager.store = data.keys || {};
+        keyManager.stats = data.stats || {};
+        keyManager.save();
+        location.reload();
+      } catch { alert('Invalid JSON'); }
+    };
+    r.readAsText(f);
+  });
+
+  // ---------- Init ----------
+  log('Conductor v3.3 ready. Add keys → choose mode → Orchestrate.');
+  log('Kimi (kimi-k2.5) and Manus (async task API) now fully supported.');
+  renderPlan({ mode: 'idle', strategy: 'Awaiting request...', models: [], timestamp: Date.now() });
+})();
+</script>
+</body>
+</html>
